@@ -19,6 +19,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.chatService
       .getNewMessage$()
       .pipe(
+        takeUntil(this.ngUnsubscribe),
         filter((message) => !!message),
         tap((message) => this.messageList.push(message))
       )
