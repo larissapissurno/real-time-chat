@@ -1,31 +1,78 @@
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { AppComponent } from './app.component';
+import {
+  Spectator,
+  createComponentFactory,
+  SpyObject,
+} from '@ngneat/spectator';
+import { ChatService } from './src/_shared/services/chat.service';
+import { of } from 'rxjs';
 
 describe('AppComponent', () => {
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      declarations: [
-        AppComponent
-      ],
-    }).compileComponents();
+  let spectator: Spectator<AppComponent>;
+  let chatServiceSpy: SpyObject<ChatService>;
+
+  const createComponent = createComponentFactory({
+    component: AppComponent,
+    mocks: [ChatService],
+    shallow: true,
+    detectChanges: false,
   });
 
-  it('should create the app', () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-    expect(app).toBeTruthy();
+  beforeEach(() => {
+    spectator = createComponent();
+
+    chatServiceSpy = spectator.inject(ChatService);
   });
 
-  it(`should have as title 'client'`, () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-    expect(app.title).toEqual('client');
+  it('should subscribe to retrieve new messages', () => {
+    // given
+    chatServiceSpy.getNewMessage$.and.returnValue(of('new message'));
+
+    // when
+    spectator.detectChanges();
+
+    // then
+    expect(chatServiceSpy.getNewMessage$).toHaveBeenCalled();
   });
 
-  it('should render title', () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    fixture.detectChanges();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.content span')?.textContent).toContain('client app is running!');
+  it('should add a message on message list', fakeAsync(() => {
+    // given
+    chatServiceSpy.getNewMessage$.and.returnValue(of('new message'));
+
+    // when
+    spectator.detectChanges();
+    tick();
+
+    // then
+    const expectedMessageList: string[] = ['new message'];
+    expect(spectator.component.messageList).toEqual(expectedMessageList);
+  }));
+
+  it('should Not add a empty message on message list', fakeAsync(() => {
+    // given
+    chatServiceSpy.getNewMessage$.and.returnValue(of(''));
+
+    // when
+    spectator.detectChanges();
+    tick();
+
+    // then
+    const expectedMessageList: string[] = [];
+    expect(spectator.component.messageList).toEqual(expectedMessageList);
+  }));
+
+  it('should send a message through the message channel', () => {
+    // given
+    spectator.component.newMessage = 'brand new messge';
+
+    // when
+    spectator.component.sendMessage();
+
+    // then
+    expect(chatServiceSpy.sendMessage).toHaveBeenCalledOnceWith(
+      'brand new messge'
+    );
+    expect(spectator.component.newMessage).toBe('');
   });
 });
